@@ -1,0 +1,33 @@
+{
+  "name": "@agentflow/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./schema": "./src/schema.ts",
+    "./client": "./src/client.ts",
+    "./seed": "./src/seed.ts",
+    "./repo/runs": "./src/repo/runs.ts",
+    "./repo/flows": "./src/repo/flows.ts",
+    "./repo/knowledge": "./src/repo/knowledge.ts",
+    "./repo/channels": "./src/repo/channels.ts",
+    "./repo/conversations": "./src/repo/conversations.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/migrate.ts",
+    "db:seed:admin": "tsx src/seed-admin.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@agentflow/shared": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.31.0",
+    "tsx": "^4.20.0"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "t1",
+      "type": "trigger-manual",
+      "typeVersion": 1,
+      "position": { "x": 0, "y": 0 },
+      "params": { "label": "Run" }
+    },
+    {
+      "id": "c1",
+      "type": "logic-condition",
+      "typeVersion": 1,
+      "position": { "x": 220, "y": 0 },
+      "params": { "field": "text", "operator": "contains", "value": "refund" }
+    },
+    {
+      "id": "l1",
+      "type": "action-log",
+      "typeVersion": 1,
+      "position": { "x": 440, "y": -120 },
+      "params": { "message": "refund requested" }
+    },
+    {
+      "id": "l2",
+      "type": "action-log",
+      "typeVersion": 1,
+      "position": { "x": 440, "y": 120 },
+      "params": { "message": "general question" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "t1", "target": "c1", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2", "source": "c1", "target": "l1", "sourceHandle": "true", "targetHandle": "in" },
+    { "id": "e3", "source": "c1", "target": "l2", "sourceHandle": "false", "targetHandle": "in" }
+  ]
+}

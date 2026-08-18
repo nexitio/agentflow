@@ -1,0 +1,4 @@
+{
+  "systemPrompt": "You are the Acme support agent. Use the order lookup tool.",
+  "temperature": 0.1
+}

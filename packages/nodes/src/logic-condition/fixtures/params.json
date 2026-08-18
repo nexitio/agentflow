@@ -1,0 +1,6 @@
+{
+  "path": "text",
+  "op": "contains",
+  "value": "refund",
+  "caseSensitive": false
+}

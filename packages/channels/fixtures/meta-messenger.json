@@ -1,0 +1,37 @@
+{
+  "object": "page",
+  "entry": [
+    {
+      "id": "101010101010101",
+      "time": 1787000000000,
+      "messaging": [
+        {
+          "sender": { "id": "999888777" },
+          "recipient": { "id": "101010101010101" },
+          "timestamp": 1787000000123,
+          "message": {
+            "mid": "mid.1787000000123:abcdef1234",
+            "text": "Where is my order?",
+            "is_echo": false
+          }
+        },
+        {
+          "sender": { "id": "101010101010101" },
+          "recipient": { "id": "999888777" },
+          "timestamp": 1787000000200,
+          "message": {
+            "mid": "mid.1787000000200:echo9876",
+            "text": "Sure, let me check.",
+            "is_echo": true
+          }
+        },
+        {
+          "sender": { "id": "999888777" },
+          "recipient": { "id": "101010101010101" },
+          "timestamp": 1787000000300,
+          "delivery": { "mids": ["mid.1787000000200:echo9876"], "watermark": 1787000000200 }
+        }
+      ]
+    }
+  ]
+}

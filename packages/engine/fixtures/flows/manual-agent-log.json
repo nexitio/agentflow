@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "t1",
+      "type": "trigger-manual",
+      "typeVersion": 1,
+      "position": { "x": 0, "y": 0 },
+      "params": { "label": "Run" }
+    },
+    {
+      "id": "a1",
+      "type": "agent",
+      "typeVersion": 1,
+      "position": { "x": 220, "y": 0 },
+      "subNodeIds": ["m1"],
+      "params": { "systemPrompt": "You are a helpful support agent.", "temperature": 0.2 }
+    },
+    {
+      "id": "m1",
+      "type": "agent-model",
+      "typeVersion": 1,
+      "position": { "x": 220, "y": 200 },
+      "params": { "model": "gpt-4o", "temperature": 0.2 }
+    },
+    {
+      "id": "l1",
+      "type": "action-log",
+      "typeVersion": 1,
+      "position": { "x": 440, "y": 0 },
+      "params": { "message": "after agent" }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "t1", "target": "a1", "sourceHandle": "out", "targetHandle": "in" },
+    { "id": "e2", "source": "a1", "target": "l1", "sourceHandle": "out", "targetHandle": "in" }
+  ]
+}

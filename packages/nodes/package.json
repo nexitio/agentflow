@@ -1,0 +1,25 @@
+{
+  "name": "@agentflow/nodes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./flow": "./src/flow.ts",
+    "./registry/definitions": "./src/registry/definitions.ts",
+    "./registry/runtimes": "./src/registry/runtimes.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "eval": "tsx src/agent/evals/run.ts"
+  },
+  "dependencies": {
+    "@agentflow/db": "workspace:*",
+    "@agentflow/shared": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}

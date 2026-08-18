@@ -1,0 +1,33 @@
+{
+  "name": "agentflow",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.17.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "vitest run --passWithNoTests",
+    "lint": "biome check --write .",
+    "eval": "pnpm --filter @agentflow/nodes eval",
+    "db:generate": "pnpm --filter @agentflow/db db:generate",
+    "db:migrate": "pnpm --filter @agentflow/db db:migrate",
+    "db:seed:admin": "pnpm --filter @agentflow/db db:seed:admin",
+    "deploy:test": "echo \"Install/upgrade CI lands in Phase 6 (docs/project-plan.md)\""
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.9",
+    "@types/node": "^22.0.0",
+    "turbo": "^2.10.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "app_id": "1234567890",
+  "event": {
+    "msg_id": "tt_msg_7890123456",
+    "sender": { "open_id": "tt_open_4455667788", "name": "TikTok Customer" },
+    "recipient": { "open_id": "tt_business_1122334455" },
+    "content": { "type": "text", "text": "Do you ship internationally?" },
+    "create_time": 1787000000
+  }
+}

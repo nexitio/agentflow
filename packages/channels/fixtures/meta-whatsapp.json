@@ -1,0 +1,48 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "222222222222222",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15550001111",
+              "phone_number_id": "333333333333333"
+            },
+            "contacts": [{ "profile": { "name": "Alex Customer" }, "wa_id": "15551112222" }],
+            "messages": [
+              {
+                "from": "15551112222",
+                "id": "wamid.ABGGFlM5abcdef",
+                "timestamp": "1787000000",
+                "type": "text",
+                "text": { "body": "How long do refunds take?" }
+              }
+            ]
+          }
+        },
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15550001111",
+              "phone_number_id": "333333333333333"
+            },
+            "statuses": [
+              {
+                "id": "wamid.ABGGFlM5delivery1",
+                "status": "delivered",
+                "timestamp": "1787000100",
+                "recipient_id": "15551112222"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

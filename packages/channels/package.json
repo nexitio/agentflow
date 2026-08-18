@@ -1,0 +1,24 @@
+{
+  "name": "@agentflow/channels",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./windows": "./src/windows.ts",
+    "./types": "./src/types.ts",
+    "./config": "./src/config.ts",
+    "./meta": "./src/meta.ts",
+    "./tiktok": "./src/tiktok.ts",
+    "./widget": "./src/widget.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@agentflow/shared": "workspace:*",
+    "ioredis": "^5.8.0",
+    "zod": "^4.4.3"
+  }
+}

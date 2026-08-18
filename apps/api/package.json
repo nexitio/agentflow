@@ -1,0 +1,29 @@
+{
+  "name": "@agentflow/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../../.env --watch --import tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@agentflow/channels": "workspace:*",
+    "@agentflow/db": "workspace:*",
+    "@agentflow/engine": "workspace:*",
+    "@agentflow/nodes": "workspace:*",
+    "@agentflow/shared": "workspace:*",
+    "@hono/node-server": "^2.1.1",
+    "bullmq": "^5.57.0",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.13.2",
+    "ioredis": "^5.8.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0"
+  }
+}
