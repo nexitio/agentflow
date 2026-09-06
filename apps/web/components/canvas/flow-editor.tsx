@@ -16,9 +16,11 @@ import "@xyflow/react/dist/style.css";
 
 import type { FlowDocument, FlowEdge, FlowNode } from "@agentflow/nodes/flow";
 import { getNodeDefinition, getNodeDefinitions } from "@agentflow/nodes/registry/definitions";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiFetch } from "../../lib/api";
+import { Icon } from "../dashboard/icons";
 import { NodeView } from "./node-view";
 import { Palette } from "./palette";
 import { ParamForm } from "./param-form";
@@ -253,25 +255,32 @@ export function FlowEditor({
 
   return (
     <NodeActionsContext.Provider value={actions}>
-      <div style={{ display: "flex", flexDirection: "column", height: "100dvh" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minWidth: 0 }}>
         <header
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "1rem",
+            gap: "0.75rem",
             padding: "10px 16px",
-            background: "var(--surface)",
-            borderBottom: "1px solid var(--border)",
+            background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+            borderBottom: "1px solid var(--border-light)",
+            WebkitBackdropFilter: "blur(12px)",
+            backdropFilter: "blur(12px)",
           }}
         >
-          <a href="/flows" style={{ fontSize: "14px" }}>
-            ← Flows
-          </a>
+          <Link
+            href="/flows"
+            className="btn btn-ghost btn-sm"
+            style={{ display: "inline-flex", gap: 6, paddingInline: 10 }}
+          >
+            <Icon name="chevronsLeft" size={15} />
+            Agents
+          </Link>
           <input
             value={name}
             onChange={(event) => setName(event.target.value)}
             aria-label="Flow name"
-            style={{ fontWeight: 600, width: 240 }}
+            className="canvas-title-input"
           />
           <span className="badge muted">{SAVE_STATE_LABEL[saveState]}</span>
           {publishMessage !== null && (

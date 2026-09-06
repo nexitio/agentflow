@@ -2,8 +2,15 @@ import { z } from "zod";
 
 import type { NodeDefinition } from "../types";
 
+/**
+ * The stock system prompt. The workspace LLM default (System → LLM
+ * Configuration) replaces this at runtime — an agent node that still carries
+ * the stock prompt has not been customized, so the workspace default applies.
+ */
+export const DEFAULT_SYSTEM_PROMPT = "You are a helpful support agent.";
+
 export const agentParamsSchema = z.object({
-  systemPrompt: z.string().default("You are a helpful support agent."),
+  systemPrompt: z.string().default(DEFAULT_SYSTEM_PROMPT),
   temperature: z.number().min(0).max(2).default(0.2),
   maxTokens: z.number().int().positive().optional(),
 });
@@ -24,7 +31,7 @@ export const agentDefinition: NodeDefinition<typeof agentParamsSchema> = {
   icon: "bot",
   paramSchema: agentParamsSchema,
   paramDefaults: () => ({
-    systemPrompt: "You are a helpful support agent.",
+    systemPrompt: DEFAULT_SYSTEM_PROMPT,
     temperature: 0.2,
   }),
   handles: { inputs: ["in"], outputs: ["out"] },

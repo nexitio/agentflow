@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { apiFetch } from "../../lib/api";
+import { Icon } from "../dashboard/icons";
 
-export function NewFlowButton() {
+export function NewFlowButton({ label = "New agent" }: { label?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -14,7 +15,7 @@ export function NewFlowButton() {
     try {
       const body = await apiFetch<{ flow: { flowId: string } }>("/api/flows", {
         method: "POST",
-        body: JSON.stringify({ name: "Untitled flow" }),
+        body: JSON.stringify({ name: "Untitled agent" }),
       });
       router.push(`/flows/${body.flow.flowId}`);
     } catch (error) {
@@ -24,8 +25,26 @@ export function NewFlowButton() {
   }
 
   return (
-    <button type="button" className="primary" onClick={() => void createFlow()} disabled={busy}>
-      {busy ? "Creating…" : "＋ New flow"}
+    <button
+      type="button"
+      className="btn btn-primary btn-lg"
+      onClick={() => void createFlow()}
+      disabled={busy}
+    >
+      {busy ? (
+        <span
+          className="spinner"
+          style={{
+            width: 15,
+            height: 15,
+            borderColor: "rgb(255 255 255 / 0.4)",
+            borderTopColor: "#fff",
+          }}
+        />
+      ) : (
+        <Icon name="plus" size={16} />
+      )}
+      {busy ? "Creating…" : label}
     </button>
   );
 }

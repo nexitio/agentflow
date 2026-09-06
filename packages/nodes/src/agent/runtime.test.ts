@@ -25,6 +25,10 @@ vi.mock("@agentflow/db/repo/knowledge", () => ({
   searchChunks: vi.fn(),
 }));
 
+vi.mock("@agentflow/db/repo/settings", () => ({
+  getLlmSettings: vi.fn(),
+}));
+
 vi.mock("@agentflow/shared/llm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentflow/shared/llm")>();
   return {
@@ -35,6 +39,7 @@ vi.mock("@agentflow/shared/llm", async (importOriginal) => {
 });
 
 import { searchChunks } from "@agentflow/db/repo/knowledge";
+import { getLlmSettings } from "@agentflow/db/repo/settings";
 import type { z } from "zod";
 
 type AgentParams = z.infer<typeof agentParamsSchema>;
@@ -42,6 +47,7 @@ type AgentParams = z.infer<typeof agentParamsSchema>;
 const chatCompletionMock = vi.mocked(chatCompletion);
 const embedMock = vi.mocked(embed);
 const searchChunksMock = vi.mocked(searchChunks);
+const getLlmSettingsMock = vi.mocked(getLlmSettings);
 
 const dbStub = {} as unknown as Db;
 
@@ -147,6 +153,8 @@ beforeEach(() => {
   chatCompletionMock.mockReset();
   embedMock.mockReset();
   searchChunksMock.mockReset();
+  getLlmSettingsMock.mockReset();
+  getLlmSettingsMock.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -190,6 +198,81 @@ describe("agent runtime — basics", () => {
   it("fails with VALIDATION when the input has no message text", async () => {
     const outcome = await agentRuntime.execute(context([modelNode()], {}), params());
     expect(outcome).toMatchObject({ type: "error", code: "VALIDATION" });
+  });
+});
+
+describe("agent runtime — workspace LLM defaults", () => {
+  it("applies workspace defaults when the Model node left model/temperature unset", async () => {
+    chatCompletionMock.mockResolvedValue(completion({ content: "Hi from workspace default!" }));
+    getLlmSettingsMock.mockResolvedValue({
+      model: "gpt-5-mini",
+      temperature: 0.1,
+      maxTokens: 1200,
+      systemPrompt: "You are Acme support. Be brief.",
+    });
+
+    const outcome = await agentRuntime.execute(
+      context([modelNode({ model: "", temperature: undefined })], { text: "hello" }),
+      params(),
+    );
+
+    expect(outcome).toMatchObject({ type: "success" });
+    const request = chatCompletionMock.mock.calls[0]?.[0];
+    expect(request?.model).toBe("gpt-5-mini");
+    expect(request?.temperature).toBe(0.1);
+    expect(request?.maxTokens).toBe(1200);
+    // Stock system prompt → the workspace default applies.
+    expect(request?.messages[0]).toMatchObject({
+      role: "system",
+      content: "You are Acme support. Be brief.",
+    });
+    expect(getLlmSettingsMock).toHaveBeenCalledWith(dbStub, "00000000-0000-7000-8000-000000000001");
+  });
+
+  it("prefers the Model node's explicit values over workspace defaults", async () => {
+    chatCompletionMock.mockResolvedValue(completion({ content: "ok" }));
+    getLlmSettingsMock.mockResolvedValue({ model: "gpt-5-mini", temperature: 0.1 });
+
+    const outcome = await agentRuntime.execute(
+      context([modelNode({ temperature: 0.9 })], { text: "hello" }),
+      params({ systemPrompt: "Be terse." }),
+    );
+
+    expect(outcome).toMatchObject({ type: "success" });
+    const request = chatCompletionMock.mock.calls[0]?.[0];
+    expect(request?.model).toBe("gpt-4o-mini");
+    expect(request?.temperature).toBe(0.9);
+    // A custom agent prompt always wins over the workspace default.
+    expect(request?.messages[0]).toMatchObject({ role: "system", content: "Be terse." });
+  });
+
+  it("falls back to LLM_MODEL when no node or workspace default is set", async () => {
+    chatCompletionMock.mockResolvedValue(completion({ content: "ok" }));
+    vi.stubEnv("LLM_MODEL", "gpt-4o-from-env");
+    getLlmSettingsMock.mockResolvedValue({});
+
+    const outcome = await agentRuntime.execute(
+      context([modelNode({ model: "" })], { text: "hello" }),
+      params(),
+    );
+
+    expect(outcome).toMatchObject({ type: "success" });
+    const request = chatCompletionMock.mock.calls[0]?.[0];
+    expect(request?.model).toBe("gpt-4o-from-env");
+  });
+
+  it("still fails with CONFIGURATION when no model can be resolved anywhere", async () => {
+    chatCompletionMock.mockResolvedValue(completion({ content: "x" }));
+    delete process.env.LLM_MODEL;
+    getLlmSettingsMock.mockResolvedValue({});
+
+    const outcome = await agentRuntime.execute(
+      context([modelNode({ model: "" })], { text: "hello" }),
+      params(),
+    );
+
+    expect(outcome).toMatchObject({ type: "error", code: "CONFIGURATION" });
+    expect(chatCompletionMock).not.toHaveBeenCalled();
   });
 });
 

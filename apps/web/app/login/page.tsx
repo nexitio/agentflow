@@ -62,7 +62,7 @@ export default function LoginPage() {
         }
 
         if (data.user) {
-          router.push("/settings");
+          router.push("/");
           router.refresh();
         }
       } catch {
@@ -99,7 +99,7 @@ export default function LoginPage() {
         }
 
         if (data.user) {
-          router.push("/settings");
+          router.push("/");
           router.refresh();
         }
       } catch {

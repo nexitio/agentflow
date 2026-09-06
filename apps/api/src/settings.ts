@@ -5,20 +5,20 @@
  * control surface for the entire platform.
  */
 
+import { randomBytes } from "node:crypto";
+import { getLlmSettings, patchLlmSettings } from "@agentflow/db/repo/settings";
+import * as schema from "@agentflow/db/schema";
+import { BUILTIN_WORKSPACE_ID } from "@agentflow/db/seed";
+import { getCookie, verifyJwt } from "@agentflow/shared/auth";
+import { UnauthorizedError } from "@agentflow/shared/errors";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { eq, and, desc, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import * as schema from "@agentflow/db/schema";
-import { BUILTIN_WORKSPACE_ID } from "@agentflow/db/seed";
-import { UnauthorizedError } from "@agentflow/shared/errors";
-import { logger } from "@agentflow/shared/logger";
-import { getCookie } from "@agentflow/shared/auth";
-import { randomBytes } from "node:crypto";
-
 const SESSION_COOKIE = "af_session";
-const SESSION_SECRET = process.env.SESSION_SECRET ?? process.env.ENCRYPTION_KEY ?? "dev-session-secret";
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ?? process.env.ENCRYPTION_KEY ?? "dev-session-secret";
 
 // ─── Auth middleware ─────────────────────────────────────────────────────────
 
@@ -27,13 +27,10 @@ function verifySession(c: { req: { header: (name: string) => string | undefined 
   email: string;
   role: string;
 } | null {
-  const { verifyJwt } = require("@agentflow/shared/auth") as typeof import("@agentflow/shared/auth");
   const cookieHeader = c.req.header("cookie") ?? null;
   const token = getCookie(cookieHeader, SESSION_COOKIE);
   if (token === undefined) return null;
 
-  const { createHash } = require("node:crypto") as typeof import("node:crypto");
-  // Use the same verification as in auth.ts
   const parts = token.split(".");
   if (parts.length !== 3) return null;
 
@@ -50,11 +47,16 @@ const updateWorkspaceSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
+/**
+ * Workspace LLM defaults (System → LLM Configuration). Absent keys leave the
+ * stored default untouched; null clears it back to "unset" so agents fall
+ * through to the per-agent Model node / LLM_MODEL environment.
+ */
 const updateLlmSchema = z.object({
-  model: z.string().min(1).optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  maxTokens: z.number().int().min(1).max(200000).optional(),
-  systemPrompt: z.string().max(10000).optional(),
+  model: z.string().trim().min(1).max(200).nullish(),
+  temperature: z.number().min(0).max(2).nullish(),
+  maxTokens: z.number().int().min(1).max(200000).nullish(),
+  systemPrompt: z.string().max(10000).nullish(),
 });
 
 const createApiKeySchema = z.object({
@@ -65,9 +67,7 @@ const createApiKeySchema = z.object({
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
-export function settingsRoutes(options: {
-  db?: PostgresJsDatabase<typeof schema>;
-}): Hono {
+export function settingsRoutes(options: { db?: PostgresJsDatabase<typeof schema> }): Hono {
   const app = new Hono();
 
   const requireDb = (): PostgresJsDatabase<typeof schema> => {
@@ -140,16 +140,19 @@ export function settingsRoutes(options: {
     });
 
     // Group by flowId and get draft + latest published
-    const agentMap = new Map<string, {
-      flowId: string;
-      name: string;
-      description: string;
-      draftVersion: number | null;
-      publishedVersion: number | null;
-      publishedAt: string | null;
-      updatedAt: string;
-      runCount: number;
-    }>();
+    const agentMap = new Map<
+      string,
+      {
+        flowId: string;
+        name: string;
+        description: string;
+        draftVersion: number | null;
+        publishedVersion: number | null;
+        publishedAt: string | null;
+        updatedAt: string;
+        runCount: number;
+      }
+    >();
 
     for (const flow of flows) {
       const existing = agentMap.get(flow.flowId);
@@ -179,14 +182,18 @@ export function settingsRoutes(options: {
     const user = requireAuth(c);
     const db = requireDb();
     const flowId = c.req.param("flowId");
-    const body = z.object({ name: z.string().min(1).max(200).optional() }).parse(await c.req.json());
+    const body = z
+      .object({ name: z.string().min(1).max(200).optional() })
+      .parse(await c.req.json());
 
     // Update all versions of this flow with the new name
     if (body.name !== undefined) {
       await db
         .update(schema.flows)
         .set({ name: body.name, updatedAt: new Date() })
-        .where(and(eq(schema.flows.workspaceId, BUILTIN_WORKSPACE_ID), eq(schema.flows.flowId, flowId)));
+        .where(
+          and(eq(schema.flows.workspaceId, BUILTIN_WORKSPACE_ID), eq(schema.flows.flowId, flowId)),
+        );
     }
 
     await db.insert(schema.auditLog).values({
@@ -212,7 +219,9 @@ export function settingsRoutes(options: {
     // Delete all versions of this flow
     await db
       .delete(schema.flows)
-      .where(and(eq(schema.flows.workspaceId, BUILTIN_WORKSPACE_ID), eq(schema.flows.flowId, flowId)));
+      .where(
+        and(eq(schema.flows.workspaceId, BUILTIN_WORKSPACE_ID), eq(schema.flows.flowId, flowId)),
+      );
 
     await db.insert(schema.auditLog).values({
       workspaceId: BUILTIN_WORKSPACE_ID,
@@ -332,6 +341,60 @@ export function settingsRoutes(options: {
     });
   });
 
+  // ─── LLM Configuration (System → LLM) ────────────────────────────────────
+
+  /**
+   * Stored workspace LLM defaults plus env facts needed to render the form.
+   * The API key itself is never returned (invariant §4.6) — only whether one
+   * is configured. The base URL is not a credential.
+   */
+  app.get("/api/settings/llm", async (c) => {
+    requireAuth(c);
+    const db = requireDb();
+    const defaults = await getLlmSettings(db, BUILTIN_WORKSPACE_ID);
+
+    return c.json({
+      defaults,
+      environment: {
+        baseUrl: process.env.LLM_BASE_URL ?? null,
+        apiKeyConfigured: (process.env.LLM_API_KEY ?? "").length > 0,
+        modelEnv: process.env.LLM_MODEL || null,
+        embeddingModel: process.env.EMBEDDING_MODEL || null,
+      },
+    });
+  });
+
+  app.put("/api/settings/llm", async (c) => {
+    const user = requireAuth(c);
+    if (user.role !== "admin") {
+      return c.json({ error: { code: "FORBIDDEN", message: "Admin access required." } }, 403);
+    }
+
+    const db = requireDb();
+    const body = updateLlmSchema.parse(await c.req.json());
+
+    await patchLlmSettings(
+      db,
+      BUILTIN_WORKSPACE_ID,
+      body as Record<string, string | number | null>,
+    );
+
+    await db.insert(schema.auditLog).values({
+      workspaceId: BUILTIN_WORKSPACE_ID,
+      userId: user.userId,
+      action: "llm.update",
+      resourceType: "settings",
+      metadata: {
+        fields: Object.entries(body)
+          .filter(([, value]) => value !== undefined)
+          .map(([key]) => key),
+      },
+    });
+
+    const defaults = await getLlmSettings(db, BUILTIN_WORKSPACE_ID);
+    return c.json({ defaults });
+  });
+
   // ─── Audit Log ─────────────────────────────────────────────────────────
 
   app.get("/api/settings/audit", async (c) => {
@@ -361,7 +424,7 @@ export function settingsRoutes(options: {
   // ─── API Keys ──────────────────────────────────────────────────────────
 
   app.get("/api/settings/api-keys", async (c) => {
-    const user = requireAuth(c);
+    requireAuth(c);
     const db = requireDb();
 
     const keys = await db.query.apiKeys.findMany({
@@ -399,9 +462,10 @@ export function settingsRoutes(options: {
     const { createHash } = await import("node:crypto");
     const keyHash = createHash("sha256").update(rawKey).digest("hex");
 
-    const expiresAt = body.expiresInDays !== undefined
-      ? new Date(Date.now() + body.expiresInDays * 24 * 60 * 60 * 1000)
-      : undefined;
+    const expiresAt =
+      body.expiresInDays !== undefined
+        ? new Date(Date.now() + body.expiresInDays * 24 * 60 * 60 * 1000)
+        : undefined;
 
     await db.insert(schema.apiKeys).values({
       workspaceId: BUILTIN_WORKSPACE_ID,
@@ -436,7 +500,9 @@ export function settingsRoutes(options: {
 
     await db
       .delete(schema.apiKeys)
-      .where(and(eq(schema.apiKeys.id, keyId), eq(schema.apiKeys.workspaceId, BUILTIN_WORKSPACE_ID)));
+      .where(
+        and(eq(schema.apiKeys.id, keyId), eq(schema.apiKeys.workspaceId, BUILTIN_WORKSPACE_ID)),
+      );
 
     await db.insert(schema.auditLog).values({
       workspaceId: BUILTIN_WORKSPACE_ID,

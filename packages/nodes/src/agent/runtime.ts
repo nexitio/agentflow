@@ -18,6 +18,7 @@
  */
 
 import { searchChunks } from "@agentflow/db/repo/knowledge";
+import { getLlmSettings, type LlmSettings } from "@agentflow/db/repo/settings";
 import { loadEnv } from "@agentflow/shared/env";
 import { ProviderError } from "@agentflow/shared/errors";
 import {
@@ -30,7 +31,7 @@ import {
 import { z } from "zod";
 
 import type { NodeOutcome, NodeRuntime, TokenUsage } from "../types";
-import type { agentParamsSchema } from "./definition";
+import { type agentParamsSchema, DEFAULT_SYSTEM_PROMPT } from "./definition";
 import {
   agentKnowledgeParamsSchema,
   agentMemoryParamsSchema,
@@ -47,6 +48,8 @@ const llmEnvSchema = z.object({
   LLM_BASE_URL: z.string().min(1),
   LLM_API_KEY: z.string().min(1),
   EMBEDDING_MODEL: z.string().min(1).optional(),
+  /** Env-level default model — below the workspace default, above nothing. */
+  LLM_MODEL: z.string().min(1).optional(),
   LLM_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
 });
 
@@ -205,14 +208,57 @@ export const agentRuntime: NodeRuntime<typeof agentParamsSchema> = {
     const knowledgeNode = ctx.subNodes.find((node) => node.type === "agent-knowledge");
     const toolNodes = ctx.subNodes.filter((node) => node.type === "agent-tool-http");
 
-    const model = parseSubNode(agentModelParamsSchema, modelNode?.params);
-    if (model === undefined) {
+    // Explicit choices are read from the RAW node params: zod defaulting in
+    // the engine would otherwise make stock defaults (0.2, the stock system
+    // prompt) indistinguishable from operator choices, and workspace defaults
+    // (System → LLM Configuration) would never apply.
+    const modelNodeParams = isRecord(modelNode?.params) ? modelNode.params : {};
+    const explicitModel =
+      typeof modelNodeParams.model === "string" ? modelNodeParams.model.trim() : "";
+    const explicitTemperature =
+      typeof modelNodeParams.temperature === "number" ? modelNodeParams.temperature : undefined;
+    const explicitMaxTokens =
+      typeof modelNodeParams.maxTokens === "number" ? modelNodeParams.maxTokens : undefined;
+
+    // Fallback chain: explicit node choice → workspace default → env/built-in.
+    const wantsWorkspaceDefaults =
+      explicitModel === "" ||
+      explicitTemperature === undefined ||
+      explicitMaxTokens === undefined ||
+      params.systemPrompt === DEFAULT_SYSTEM_PROMPT;
+    let workspaceDefaults: LlmSettings = {};
+    if (wantsWorkspaceDefaults) {
+      try {
+        workspaceDefaults = await getLlmSettings(ctx.db, ctx.workspaceId);
+      } catch {
+        // Defaults are a convenience layer, not critical-path: an offline
+        // settings read degrades to per-agent config + environment instead of
+        // failing the run.
+        ctx.logger.warn(
+          "workspace LLM defaults unavailable — using per-agent config and environment",
+          { workspaceId: ctx.workspaceId },
+        );
+      }
+    }
+
+    const model =
+      explicitModel !== "" ? explicitModel : (workspaceDefaults.model ?? env.LLM_MODEL ?? "");
+    if (model === "") {
       return {
         type: "error",
         code: "CONFIGURATION",
-        message: "The agent needs a Model sub-node attached (provider + model).",
+        message:
+          "The agent needs a model — set one on its Model sub-node, in System → LLM Configuration, or via LLM_MODEL.",
       };
     }
+    const temperature = explicitTemperature ?? workspaceDefaults.temperature ?? params.temperature;
+    const maxTokens = explicitMaxTokens ?? workspaceDefaults.maxTokens ?? params.maxTokens;
+    // A stock system prompt means the operator never customized this agent —
+    // the workspace default applies then, and a custom prompt always wins.
+    const systemPrompt =
+      params.systemPrompt === DEFAULT_SYSTEM_PROMPT && workspaceDefaults.systemPrompt !== undefined
+        ? workspaceDefaults.systemPrompt
+        : params.systemPrompt;
 
     const tools: WiredTool[] = [];
     for (const node of toolNodes) {
@@ -236,7 +282,7 @@ export const agentRuntime: NodeRuntime<typeof agentParamsSchema> = {
     }
     const history = readHistory(ctx.input, windowSize);
     const messages: ChatMessage[] = [
-      { role: "system", content: params.systemPrompt },
+      { role: "system", content: systemPrompt },
       ...history.map((turn) => ({ role: turn.role as ChatMessage["role"], content: turn.content })),
     ];
 
@@ -299,10 +345,17 @@ export const agentRuntime: NodeRuntime<typeof agentParamsSchema> = {
     }
 
     // --- Structured output config. ---
+    const modelConfig = parseSubNode(agentModelParamsSchema, modelNode?.params);
+    const responseFormat =
+      modelConfig?.responseFormat ??
+      (modelNodeParams.responseFormat === "json_schema" ? "json_schema" : "text");
+    const responseSchemaText =
+      modelConfig?.responseSchema ??
+      (typeof modelNodeParams.responseSchema === "string" ? modelNodeParams.responseSchema : "");
     let responseSchema: Record<string, unknown> | undefined;
     let jsonMode = false;
-    if (model.responseFormat === "json_schema") {
-      const checked = parseResponseSchema(model.responseSchema);
+    if (responseFormat === "json_schema") {
+      const checked = parseResponseSchema(responseSchemaText);
       if (!checked.ok) {
         return {
           type: "error",
@@ -345,11 +398,11 @@ export const agentRuntime: NodeRuntime<typeof agentParamsSchema> = {
       const response = await chatCompletion({
         baseUrl: env.LLM_BASE_URL,
         apiKey: env.LLM_API_KEY,
-        model: model.model,
+        model,
         messages,
         tools: chatTools,
-        temperature: model.temperature ?? params.temperature,
-        maxTokens: model.maxTokens ?? params.maxTokens,
+        temperature,
+        maxTokens,
         timeoutMs: env.LLM_TIMEOUT_MS,
         ...(providerEnforced && responseSchema !== undefined
           ? { structuredOutput: { name: "response", jsonSchema: responseSchema } }
