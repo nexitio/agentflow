@@ -10,6 +10,7 @@
     "./repo/runs": "./src/repo/runs.ts",
     "./repo/flows": "./src/repo/flows.ts",
     "./repo/knowledge": "./src/repo/knowledge.ts",
+    "./repo/settings": "./src/repo/settings.ts",
     "./repo/channels": "./src/repo/channels.ts",
     "./repo/conversations": "./src/repo/conversations.ts"
   },
